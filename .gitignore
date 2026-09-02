@@ -1,0 +1,32 @@
+# Ambiente Virtual
+.venv/
+venv/
+env/
+
+# IDE e Editor (PyCharm)
+.idea/
+.vscode/
+
+# Buildozer e Compilação Android
+.buildozer/
+bin/
+*.apk
+*.aab
+
+# Banco de Dados Local
+refeitorio.db
+*.sqlite3
+
+# Arquivos Gerados pelo Sistema
+relatorios_gerados/
+log_erro.txt
+
+# Arquivos temporários do Python (Cache)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
