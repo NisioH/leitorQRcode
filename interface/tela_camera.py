@@ -7,10 +7,21 @@ from PySide6.QtWidgets import (
 from PySide6.QtMultimedia import QSoundEffect
 import cv2
 import time
+import sys
+import os
 
 
 # Tempo mínimo (em segundos) entre leituras do MESMO QR Code
 SEGUNDOS_ENTRE_LEITURAS = 5
+
+
+def resource_path(relative_path):
+    """Resolve o caminho de um recurso, funcionando tanto em dev quanto no .exe"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 class ThreadCamera(QThread):
@@ -21,7 +32,6 @@ class ThreadCamera(QThread):
         super().__init__(parent)
         self.leitor = leitor_camera
         self._rodando = True
-        # Trava temporal: guarda o último código e quando foi lido
         self._ultimo_codigo = None
         self._tempo_ultimo_codigo = 0.0
 
@@ -54,7 +64,6 @@ class ThreadCamera(QThread):
                 mesmo_codigo = (texto_qr == self._ultimo_codigo)
                 tempo_decorrido = agora - self._tempo_ultimo_codigo
 
-                # Só emite se for um código diferente OU se já passou tempo suficiente
                 if not mesmo_codigo or tempo_decorrido >= SEGUNDOS_ENTRE_LEITURAS:
                     self._ultimo_codigo = texto_qr
                     self._tempo_ultimo_codigo = agora
@@ -64,7 +73,7 @@ class ThreadCamera(QThread):
 
     def parar(self):
         self._rodando = False
-        self.wait(3000)  # espera até 3 segundos
+        self.wait(3000)
         if self.isRunning():
             self.terminate()
             self.wait(1000)
@@ -81,9 +90,10 @@ class TelaCamera(QMainWindow):
         self.setWindowTitle("Controle de Refeitório")
         self.setMinimumSize(800, 700)
 
-        # Som de confirmação
+        # Som de confirmação (com caminho compatível com .exe)
         self.som = QSoundEffect()
-        self.som.setSource(QUrl.fromLocalFile("bip.wav"))
+        caminho_som = resource_path("bip.wav")
+        self.som.setSource(QUrl.fromLocalFile(caminho_som))
         self.som.setVolume(0.8)
 
         # Widgets
@@ -164,17 +174,14 @@ class TelaCamera(QMainWindow):
             QMessageBox.warning(self, "Relatório", mensagem)
 
     def alternar_camera(self):
-        # Evita cliques repetidos enquanto a troca acontece
         self.botao_alternar.setEnabled(False)
         self.botao_alternar.setText("Trocando câmera...")
 
         try:
-            # 1. Para a thread atual e aguarda ela realmente terminar
             if self.thread_camera is not None:
                 self.thread_camera.parar()
                 self.thread_camera = None
 
-            # 2. Tenta alternar. Se não houver outra câmera, mantém a atual.
             trocou = self.leitor.alternar_camera()
 
             if not trocou:
@@ -185,7 +192,6 @@ class TelaCamera(QMainWindow):
                     "Nenhuma câmera alternativa encontrada. Mantendo a atual."
                 )
 
-            # 3. Reinicia a thread (com a câmera atual ou a nova)
             self._iniciar_thread_camera()
 
         except Exception as e:
