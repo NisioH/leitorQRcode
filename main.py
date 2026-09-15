@@ -5,7 +5,7 @@ from camera.leitorCamera import LeitorCamera
 from conexao.conexaoBanco import BancoDeDados
 from regras.gerenciadorRefeitorio import GerenciadorRefeitorio
 from relatorios.geradorRelatorio import GeradorRelatorio
-from Interface.tela_camera import TelaCamera
+from interface.tela_camera import TelaCamera
 
 
 def main():

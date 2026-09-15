@@ -44,3 +44,5 @@ toml==0.10.2
 urllib3==2.7.0
 virtualenv==21.7.5
 wheel==0.43.0
+
+pyside6

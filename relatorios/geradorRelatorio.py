@@ -19,11 +19,11 @@ class GeradorRelatorio:
             return False, f"Aviso: Nenhum registro de refeição encontrado para {data_relatorio}."
 
         try:
-            nome_arquivo = f"Relatorio_Refeicoes_{data_relatorio}.txt"
+            nome_arquivo = f"Relatório_Refeições_{data_relatorio}.txt"
             caminho_completo = os.path.join(self.pasta_saida, nome_arquivo)
 
             with open(caminho_completo, 'w', encoding='utf-8') as arquivo:
-                arquivo.write(f"=== RELATORIO DE REFEICOES: {data_relatorio} ===\n\n")
+                arquivo.write(f"=== RELATÓRIO DE REFEIÇÕES: {data_relatorio} ===\n\n")
 
                 setor_atual = None
 
@@ -38,7 +38,7 @@ class GeradorRelatorio:
                     arquivo.write(f" - {nome}\n")
 
                 arquivo.write("\n" + "=" * 45 + "\n")
-                arquivo.write(f"TOTAL DE REFEICOES SERVIDAS: {len(resultados)}\n")
+                arquivo.write(f"TOTAL DE REFEIÇÕES SERVIDAS: {len(resultados)}\n")
 
             return True, f"Sucesso! Relatório TXT gerado na pasta."
 

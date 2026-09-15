@@ -8,6 +8,8 @@ class LeitorCamera:
         self.cap = None
 
     def iniciar(self):
+        if self.cap is not None and self.cap.isOpened():
+            return
         self.cap = cv2.VideoCapture(self.camera_id)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -28,15 +30,27 @@ class LeitorCamera:
 
             (x, y, w, h) = codigo.rect
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
-            cv2.putText(frame, "LIDO!", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            cv2.putText(frame, "LIDO!", (x, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
         return frame, texto_qr
 
     def liberar(self):
         if self.cap:
             self.cap.release()
+            self.cap = None
+
+    def camera_disponivel(self, camera_id):
+        """Testa se uma câmera pode ser aberta, sem afetar a atual."""
+        teste = cv2.VideoCapture(camera_id)
+        disponivel = teste.isOpened()
+        teste.release()
+        return disponivel
 
     def alternar_camera(self):
-        self.liberar()
-        self.camera_id = 1 if self.camera_id == 0 else 0
-        self.iniciar()
+        """Alterna entre 0 e 1. Se a alternativa não existir, mantém a atual."""
+        novo_id = 1 if self.camera_id == 0 else 0
+        if self.camera_disponivel(novo_id):
+            self.camera_id = novo_id
+            return True
+        return False
