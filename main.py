@@ -1,144 +1,100 @@
+import flet as ft
 import cv2
-from kivy.core.window import Window
-from kivy.clock import Clock
-from kivy.graphics.texture import Texture
-from kivy.uix.image import Image
-from kivymd.app import MDApp
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.label import MDLabel
-from kivymd.uix.button import MDButton, MDButtonText
+import asyncio
+import time
+import os
+from pyzbar.pyzbar import decode
 
-# Importando as nossas classes
-from conexao.conexaoBanco import BancoDeDados
-from regras.gerenciadorRefeitorio import GerenciadorRefeitorio
-from camera.leitorCamera import LeitorCamera
-from relatorios.geradorRelatorio import GeradorRelatorio
+os.environ["GDK_BACKEND"] = "x11"
 
 
-class AppRefeitorio(MDApp):
-    def build(self):
-        self.theme_cls.primary_palette = "Green"
-        self.theme_cls.theme_style = "Light"
+async def main(page: ft.Page):
+    page.title = "Controle de Refeitório"
+    page.theme_mode = ft.ThemeMode.DARK
+    page.padding = 20
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.update()
 
-        self.banco = BancoDeDados()
-        self.gerenciador = GerenciadorRefeitorio(self.banco)
-        self.leitor = LeitorCamera(camera_id=0)
-        self.gerador_relatorio = GeradorRelatorio(self.banco)
+    texto_status = ft.Text("Aguardando leitura...", size=20, weight="bold", color="blue700")
 
-        self.leitor.iniciar()
-        self.pausa_leitura = False
+    camera_image = ft.RawImage(
+        width=600,
+        height=480,
+        fit=ft.BoxFit.CONTAIN,
+        filter_quality=ft.FilterQuality.MEDIUM,
+    )
 
-        tela = MDScreen()
-        layout = MDBoxLayout(orientation='vertical', padding=20, spacing=20)
+    def gerar_relatorio(e):
+        texto_status.value = "Relatório gerado com sucesso!"
+        texto_status.color = "blue700"
+        page.update()
 
-        titulo = MDLabel(
-            text="Leitor do Refeitório",
-            halign="center",
-            font_style="Headline",
-            role="small",
-            size_hint_y=0.1
-        )
+    page.add(
+        ft.Row(
+            [ft.Icon("restaurant", size=40), ft.Text("Refeitório", size=30, weight="bold")],
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        ft.Divider(),
+        camera_image,
+        ft.Container(height=10),
+        texto_status,
+        ft.Container(height=20),
+        ft.Button("Gerar Relatório do Dia", icon="insert_drive_file", on_click=gerar_relatorio),
+    )
 
-        self.camera_feed = Image(size_hint_y=0.6)
+    running = True
 
-        self.lbl_status = MDLabel(
-            text="Aguardando QR Code...",
-            halign="center",
-            font_style="Title",
-            role="medium",
-            theme_text_color="Custom",
-            text_color=(0, 0.5, 0, 1),
-            size_hint_y=0.1
-        )
+    async def atualiza_camera():
+        nonlocal running
 
-        # ... (código existente da lbl_status) ...
+        while camera_image.page is None:
+            await asyncio.sleep(0.01)
 
-        # --- NOVO BOTÃO DE TROCAR CÂMERA ---
-        btn_trocar_camera = MDButton(
-            MDButtonText(
-                text="Trocar Câmera",
-                pos_hint={"center_x": 0.5, "center_y": 0.5}
-            ),
-            style="tonal",  # Usamos 'tonal' para ele ficar um pouco diferente do botão verde principal
-            theme_width="Custom",
-            size_hint_x=0.8,
-            pos_hint={"center_x": 0.5}
-        )
-        btn_trocar_camera.bind(on_release=self.acao_trocar_camera)
+        cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            texto_status.value = "Erro: não foi possível abrir a câmera."
+            texto_status.color = "red700"
+            page.update()
+            return
 
-        # O botão de gerar relatório (já existia)
-        btn_relatorio = MDButton(
-            MDButtonText(
-                text="Gerar Relatório do Dia",
-                pos_hint={"center_x": 0.5, "center_y": 0.5}
-            ),
-            style="filled",
-            theme_width="Custom",
-            size_hint_x=0.8,
-            pos_hint={"center_x": 0.5}
-        )
-        btn_relatorio.bind(on_release=self.acao_gerar_relatorio)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-        # Adicionando tudo no layout na ordem correta:
-        layout.add_widget(titulo)
-        layout.add_widget(self.camera_feed)
-        layout.add_widget(btn_trocar_camera)  # <--- Botão novo aqui
-        layout.add_widget(self.lbl_status)
-        layout.add_widget(btn_relatorio)
-        tela.add_widget(layout)
+        ultimo_codigo = ""
+        tempo_ultima_leitura = 0
 
-        Clock.schedule_interval(self.atualizar_camera, 1.0 / 30.0)
+        while running:
+            sucesso, frame = cap.read()
+            if not sucesso:
+                await asyncio.sleep(0.05)
+                continue
 
-        return tela
+            codigos = decode(frame)
+            for codigo in codigos:
+                texto_qr = codigo.data.decode("utf-8")
+                (x, y, w, h) = codigo.rect
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
 
-    def atualizar_camera(self, dt):
-        frame, texto_qr = self.leitor.ler_frame_e_qr()
+                if texto_qr != ultimo_codigo or (time.time() - tempo_ultima_leitura) > 3:
+                    ultimo_codigo = texto_qr
+                    tempo_ultima_leitura = time.time()
+                    texto_status.value = f"Liberado: {texto_qr}"
+                    texto_status.color = "green700"
+                    page.update()
 
-        if frame is not None:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_flip = cv2.flip(frame_rgb, 0)
-            buf = frame_flip.tobytes()
+            frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
 
-            textura = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='rgb')
-            textura.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
-            self.camera_feed.texture = textura
+            try:
+                await camera_image.render(frame_rgba)
+            except (RuntimeError, TimeoutError):
+                break
 
-        if texto_qr and not self.pausa_leitura:
-            self.processar_qr(texto_qr)
+            await asyncio.sleep(0.066)
 
-    def processar_qr(self, texto_qr):
-        self.pausa_leitura = True
+        cap.release()
 
-        print(f"\n[CÂMERA] QR Code detectado: {texto_qr}")
-        sucesso, mensagem = self.gerenciador.processar_leitura_qr(texto_qr)
-        print(f"[SISTEMA] {mensagem}\n")
-
-        self.mostrar_aviso(mensagem)
-        Clock.schedule_once(self.liberar_leitura, 2)
-
-    def liberar_leitura(self, dt):
-        self.pausa_leitura = False
-
-    def acao_gerar_relatorio(self, instancia):
-        sucesso, mensagem = self.gerador_relatorio.exportar_txt_do_dia()
-        self.mostrar_aviso(mensagem)
-
-    def acao_trocar_camera(self, instancia):
-        self.leitor.alternar_camera()
-        self.mostrar_aviso(f"Câmera alternada (ID: {self.leitor.camera_id})")
-
-    def mostrar_aviso(self, mensagem):
-        self.lbl_status.text = mensagem
-        Clock.schedule_once(self.limpar_aviso, 3)
-
-    def limpar_aviso(self, dt):
-        self.lbl_status.text = "Aguardando QR Code..."
-
-    def on_stop(self):
-        self.leitor.liberar()
+    # Usar asyncio.create_task diretamente (como nos exemplos oficiais)
+    asyncio.create_task(atualiza_camera())
 
 
-if __name__ == '__main__':
-    Window.size = (360, 640)
-    AppRefeitorio().run()
+ft.run(main, view=ft.AppView.WEB_BROWSER)
