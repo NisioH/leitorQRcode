@@ -27,6 +27,11 @@ __pycache__/
 *$py.class
 *.so
 
+*.exe 
+
+*.spec
+build/
+
 # Sistema Operacional
 .DS_Store
 Thumbs.db
