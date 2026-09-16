@@ -1,10 +1,35 @@
 import sqlite3
+import os
+import sys
 from datetime import date
+
+
+def obter_pasta_dados():
+    """Retorna uma pasta permanente para guardar o banco de dados.
+
+    - Em desenvolvimento (python main.py): usa a pasta do projeto.
+    - Como .exe (PyInstaller): usa %APPDATA%\\LeitorQRCode no Windows,
+      ou ~/.local/share/LeitorQRCode no Linux.
+    """
+    if getattr(sys, 'frozen', False):
+        # Rodando como executável
+        if sys.platform.startswith('win'):
+            base = os.getenv('APPDATA') or os.path.expanduser('~')
+        else:
+            base = os.path.join(os.path.expanduser('~'), '.local', 'share')
+        pasta = os.path.join(base, "LeitorQRCode")
+    else:
+        # Rodando em desenvolvimento
+        pasta = os.path.abspath(".")
+
+    os.makedirs(pasta, exist_ok=True)
+    return pasta
 
 
 class BancoDeDados:
     def __init__(self, nome_banco="refeitorio.db"):
-        self.nome_banco = nome_banco
+        pasta = obter_pasta_dados()
+        self.nome_banco = os.path.join(pasta, nome_banco)
         self._criar_tabelas()
 
     def _conectar(self):
